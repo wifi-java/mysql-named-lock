@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mysql.namedlock.dao.MenuDao">
+    <insert id="insertMenu" parameterType="com.mysql.namedlock.model.Menu">
+        INSERT INTO TB_MENU
+        (NAME,
+        STOCK)
+        VALUES (#{name},
+        #{stock})
+
+        <selectKey keyProperty="idx" resultType="String" order="AFTER">
+            SELECT IDX FROM TB_MENU
+        </selectKey>
+    </insert>
+
+    <select id="selectMenu" parameterType="String" resultType="com.mysql.namedlock.model.Menu">
+        SELECT * FROM TB_MENU WHERE IDX = #{idx}
+    </select>
+
+    <update id="updateMenuStock" parameterType="com.mysql.namedlock.model.Menu">
+        UPDATE TB_MENU
+        SET STOCK = #{stock}
+        WHERE IDX = #{idx}
+    </update>
+
+    <delete id="deleteMenu">
+        DELETE
+        FROM TB_MENU
+    </delete>
+
+</mapper>

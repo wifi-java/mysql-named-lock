@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    primary:
+      driver-class-name: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+      jdbc-url: jdbc:log4jdbc:mysql://localhost:3306/dev?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&socketTimeout=20000&connectTimeout=20000
+      username: root
+      password: 1234
+      validationQuery: select 1
+      test-on-borrow: true
+      idleTimeout: 600000
+      maxLifetime: 1800000
+      maximum-pool-size: 50
+
+
+logging:
+  config: classpath:log4j2-dev.xml
