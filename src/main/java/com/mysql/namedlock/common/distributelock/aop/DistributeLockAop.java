@@ -2,8 +2,8 @@ package com.mysql.namedlock.common.distributelock.aop;
 
 import com.mysql.namedlock.common.distributelock.NamedLock;
 import com.mysql.namedlock.common.distributelock.annotation.DistributeLock;
-import com.mysql.namedlock.common.distributelock.dao.NamedLockDao;
 import com.mysql.namedlock.common.distributelock.service.LockService;
+import com.mysql.namedlock.common.distributelock.service.DistributeLockConnectionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -16,6 +16,8 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.List;
 
 @Aspect
@@ -24,7 +26,7 @@ import java.util.List;
 @Slf4j
 public class DistributeLockAop {
   private final DistributeLockTransaction transaction;
-  private final NamedLockDao namedLockDao;
+  private final DistributeLockConnectionService lockConnectionService;
 
   // DistributeLock 어노테이션에 패키지 경로
   @Around("@annotation(com.mysql.namedlock.common.distributelock.annotation.DistributeLock)")
@@ -39,10 +41,14 @@ public class DistributeLockAop {
     LockService lockService = NamedLock.getLockService(useType);
     List<String> locks = lockService.lock(key, useType);
 
+    Connection lockConnection = null;
     try {
+      // 락 획득용 별도 커넥션 확보
+      lockConnection = lockConnectionService.getConnection();
+
       for (String lock : locks) {
-        Integer result = namedLockDao.getLock(lock);
-        boolean isLocked = (result != null && result == 1);
+        int result = lockConnectionService.getLock(lockConnection, lock);
+        boolean isLocked = (result == 1);
         log.info("lock key => {}, isLock {}", lock, isLocked);
 
         if (!isLocked) {
@@ -59,14 +65,21 @@ public class DistributeLockAop {
       // 하기때문에 AOP로 한번 감싸준다.
       return transaction.proceed(joinPoint);
     } catch (Exception e) {
-      throw new Exception(e.getMessage());
+        throw new Exception("락 획득 중 오류 발생: " + e.getMessage(), e);
     } finally {
-      for (String lock : locks) {
-        namedLockDao.releaseLock(lock);
-        log.info("unlock key => {}", lock);
+      try {
+        for (String lock : locks) {
+          if (lockConnection != null) {
+            lockConnectionService.releaseLock(lockConnection, lock);
+            log.info("unlock key => {}", lock);
+          }
+        }
+      } catch (SQLException e) {
+        log.error("락 해제 중 오류 발생", e);
+      } finally {
+        lockConnectionService.closeConnection(lockConnection);
+        locks.clear();
       }
-
-      locks.clear();
     }
   }
 
